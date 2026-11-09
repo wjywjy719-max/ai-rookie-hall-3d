@@ -73,7 +73,13 @@ kbd { font-family: var(--f-ui); font-size: 11px; padding: 1px 5px; border: 1px s
 #debug { position: absolute; left: calc(var(--gutter) + env(safe-area-inset-left, 0px)); bottom: calc(var(--gutter) + env(safe-area-inset-bottom, 0px)); margin: 0; padding: 10px 12px; font: 500 12px/1.65 ui-monospace, "Cascadia Mono", Consolas, var(--f-ui); color: var(--text); white-space: pre; }
 
 #touch { position: absolute; right: calc(var(--gutter) + env(safe-area-inset-right, 0px)); bottom: calc(var(--gutter) + 70px + env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column; gap: 10px; pointer-events: auto; }
-#touch button { width: 58px; height: 58px; border-radius: 50%; font: 700 13px var(--f-ui); color: var(--text); background: var(--glass); border: 1px solid var(--edge); }
+#touch button { width: 58px; height: 58px; border-radius: 50%; font: 700 13px var(--f-ui); color: var(--text); background: var(--glass); border: 1px solid var(--edge); touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+#touch .jump-wrap { position: relative; display: flex; }
+/* 비행 중 ▲▼: 세로 화면은 점프 버튼 왼쪽, 가로 화면은 위쪽 */
+#fly-pad { position: absolute; right: calc(100% + 10px); bottom: 0; display: flex; flex-direction: column; gap: 10px; }
+#fly-pad button { font-size: 16px; }
+#touch button.held { background: rgba(63, 230, 212, 0.45); border-color: var(--led); }
+#touch button.flying { background: rgba(63, 230, 212, 0.22); border-color: var(--led); color: var(--led); }
 #fs-btn { position: absolute; right: calc(var(--gutter) + env(safe-area-inset-right, 0px)); bottom: calc(var(--gutter) + env(safe-area-inset-bottom, 0px)); pointer-events: auto; display: flex; align-items: center; gap: 8px; padding: 8px 12px; font: 700 13px var(--f-ui); color: var(--text); cursor: pointer; }
 #fs-btn:hover { border-color: rgba(255,255,255,0.32); }
 #fs-btn:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
@@ -124,6 +130,7 @@ kbd { font-family: var(--f-ui); font-size: 11px; padding: 1px 5px; border: 1px s
   .legend { display: none; }
   #touch { flex-direction: row; bottom: calc(var(--gutter) + env(safe-area-inset-bottom, 0px)); }
   #touch button { width: 52px; height: 52px; }
+  #fly-pad { right: auto; left: 0; bottom: calc(100% + 10px); }
   #booth { bottom: calc(var(--gutter) + env(safe-area-inset-bottom, 0px)); max-width: calc(100vw - 2 * var(--gutter) - 400px); min-width: 200px; padding: 8px 12px; gap: 8px; }
   #booth .bid { font-size: 15px; }
   #booth .bname { font-size: 14px; }
@@ -139,7 +146,7 @@ kbd { font-family: var(--f-ui); font-size: 11px; padding: 1px 5px; border: 1px s
 @media (pointer: fine), (pointer: none) { #start .keys.mobile { display: none; } }
 /* 세로 휴대폰: 부스 이름을 조이스틱 위로 */
 @media (pointer: coarse) and (orientation: portrait) {
-  #booth { left: calc(var(--gutter) + env(safe-area-inset-left, 0px)); transform: none; bottom: calc(var(--gutter) + 150px + env(safe-area-inset-bottom, 0px)); }
+  #booth { left: calc(var(--gutter) + env(safe-area-inset-left, 0px)); transform: none; bottom: calc(var(--gutter) + 150px + env(safe-area-inset-bottom, 0px)); max-width: calc(100vw - 2 * var(--gutter) - 150px); }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
@@ -178,7 +185,7 @@ kbd { font-family: var(--f-ui); font-size: 11px; padding: 1px 5px; border: 1px s
     <pre id="debug" class="panel" hidden></pre>
     <div id="joy" hidden><i></i></div>
     <button id="fs-btn" class="panel" type="button" hidden><span>전체화면</span><kbd>F</kbd></button>
-    <div id="touch" hidden><button id="t-fs" type="button">전체</button><button id="t-view" type="button">시점</button><button id="t-jump" type="button">점프</button></div>
+    <div id="touch" hidden><button id="t-fs" type="button">전체</button><button id="t-view" type="button">시점</button><div class="jump-wrap"><div id="fly-pad" hidden><button id="t-up" type="button" aria-label="위로">▲</button><button id="t-down" type="button" aria-label="아래로">▼</button></div><button id="t-jump" type="button">점프</button></div></div>
   </div>
   <div id="pause" hidden>
     <div class="card panel" role="dialog" aria-labelledby="pause-title">
@@ -212,6 +219,7 @@ kbd { font-family: var(--f-ui); font-size: 11px; padding: 1px 5px; border: 1px s
         <li><b>왼쪽 조이스틱</b>이동 · 끝까지 밀면 달리기</li>
         <li><b>오른쪽 화면 드래그</b>둘러보기 · 이동하면서 가능</li>
         <li><b>오른쪽 버튼</b>전체화면 · 시점 · 점프</li>
+        <li><b>점프 두 번</b>공중에 멈추고 ▲▼로 오르내리기, '하강'을 누르면 떨어짐</li>
         <li><b>화면 방향</b>가로 · 세로 모두 가능</li>
       </ul>
     </div>
@@ -916,7 +924,7 @@ function teleport(which) {
 }
 
 /* ---------------- 입력: 컴퓨터는 마인크래프트(Java 에디션) 기본 키 ---------------- */
-const isTouch = matchMedia('(pointer: coarse)').matches;
+let isTouch = matchMedia('(pointer: coarse)').matches;   // 터치를 감지하면 아래 enableTouch()로 바뀔 수 있다
 const keys = new Set();
 let started = false, locked = false, wasLocked = false, dragging = false, paused = false;
 let showMap = true, showHelp = true, showHud = true, showDebug = false, lastW = 0, lastSpace = 0;
@@ -993,8 +1001,15 @@ function moveStick(t) {
   if (L > JOY_MAX) { dx *= JOY_MAX / L; dy *= JOY_MAX / L; }
   stick.dx = dx / JOY_MAX; stick.dy = dy / JOY_MAX; setKnob(dx, dy);
 }
+// 기기가 터치 화면을 '정밀 포인터'로 알리는 경우가 있어, 실제 터치가 들어오면 휴대폰 조작으로 바꾼다
+function enableTouch() {
+  if (isTouch) return;
+  isTouch = true;
+  if (started) applyInputUI();
+}
 canvas.addEventListener('touchstart', (e) => {
   if (!started) return;
+  enableTouch();
   for (const t of e.changedTouches) {
     if (t.clientX < innerWidth / 2 && stick.id === null) {
       const [hx, hy] = joyHome(), near = Math.hypot(t.clientX - hx, t.clientY - hy) < 90;
@@ -1020,7 +1035,35 @@ const endTouch = (e) => {
 };
 canvas.addEventListener('touchend', endTouch); canvas.addEventListener('touchcancel', endTouch);
 $('t-view').addEventListener('click', cycleView);
-$('t-jump').addEventListener('click', () => { if (P.onGround) { P.vy = 4.2; P.onGround = false; } });
+// 점프 버튼: 한 번 = 점프, 빠르게 두 번 = 공중에 멈춤(비행). 비행 중에는 '하강' 버튼이 되어 누르면 비행을 끝내고 떨어진다
+let lastJumpTap = 0;
+$('t-jump').addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  const now = performance.now();
+  if (P.fly) { P.fly = false; P.vy = 0; lastJumpTap = 0; return; }
+  if (now - lastJumpTap < 300) { P.fly = true; P.vy = 0; lastJumpTap = 0; return; }
+  lastJumpTap = now;
+  if (P.onGround) { P.vy = 4.2; P.onGround = false; }
+});
+// 비행 중 ▲▼ 버튼: 누르고 있는 동안 오르내림
+const flyBtn = { up: false, down: false };
+for (const [id, key] of [['t-up', 'up'], ['t-down', 'down']]) {
+  const el = $(id);
+  const off = () => { flyBtn[key] = false; el.classList.remove('held'); };
+  el.addEventListener('pointerdown', (e) => {
+    e.preventDefault(); flyBtn[key] = true; el.classList.add('held');
+    try { el.setPointerCapture(e.pointerId); } catch (_) { /* 캡처 불가 시 pointerup으로 해제 */ }
+  });
+  for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) el.addEventListener(ev, off);
+}
+for (const el of document.querySelectorAll('#touch button')) el.addEventListener('contextmenu', (e) => e.preventDefault());
+let flyUI = false;
+function setFlyUI(on) {
+  flyUI = on; $('fly-pad').hidden = !on;
+  const j = $('t-jump'); j.textContent = on ? '하강' : '점프'; j.classList.toggle('flying', on);
+  if (!on) for (const id of ['t-up', 't-down']) $(id).classList.remove('held');
+  if (!on) flyBtn.up = flyBtn.down = false;
+}
 
 /* ---------------- 전체화면 ---------------- */
 const root = document.documentElement;
@@ -1109,9 +1152,9 @@ function update(dt) {
 
   const g = groundAt(P.x, P.z);
   if (P.fly) {
-    const v = (keys.has('Space') ? 1 : 0) - (shift ? 1 : 0);
+    const v = (keys.has('Space') || flyBtn.up ? 1 : 0) - (shift || flyBtn.down ? 1 : 0);
     P.y = Math.min(WALL_H - 0.4 - EYE, P.y + v * FLY_V * dt);
-    if (P.y <= g) { P.y = g; if (v < 0) P.fly = false; }          // 내려와 바닥에 닿으면 날기 끝
+    if (P.y <= g) { P.y = g; if (v < 0 && !isTouch) P.fly = false; }   // 컴퓨터는 바닥에 닿으면 날기 끝, 휴대폰은 '하강'을 누를 때까지 유지
     P.vy = 0; P.onGround = P.y <= g + 1e-3;
   } else {
     if (keys.has('Space') && P.onGround) { P.vy = 4.2; P.onGround = false; }
@@ -1126,6 +1169,7 @@ function update(dt) {
   if (P.onGround && !P.fly) P.phase += dt * P.speed * 3.1;
   const state = P.fly ? '날기' : P.sneak ? '웅크리기' : P.sprint && P.speed > 0.5 ? '달리기' : '걷기';
   if (state !== lastState) { $('speed').textContent = state; lastState = state; }
+  if (P.fly !== flyUI) setFlyUI(P.fly);
 }
 
 function camBlocked(x, y, z) {
@@ -1287,14 +1331,17 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
-function begin() {
-  started = true;
-  $('start').hidden = true; $('hud').hidden = false;
+function applyInputUI() {
   $('touch').hidden = !isTouch; $('joy').hidden = !isTouch;
   if (isTouch) homeJoy();
   $('t-fs').hidden = !canFS;
   $('fs-btn').hidden = isTouch || !canFS;
   if (isTouch || innerWidth < 640) { showHelp = false; $('help').hidden = true; }
+}
+function begin() {
+  started = true;
+  $('start').hidden = true; $('hud').hidden = false;
+  applyInputUI();
   $('chip-view').textContent = MODE_LABEL[P.mode];
   drawMinimapStatic(); updateCross();
   if (!isTouch) { requestLock(); enterFS(); }   // 컴퓨터는 입장과 함께 전체화면
